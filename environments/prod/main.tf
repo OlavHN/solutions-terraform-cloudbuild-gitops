@@ -67,59 +67,32 @@ module "workbench" {
 // BEGIN WEBHOOK EXPERIMENT
 // TODO: Secrets will be injected into TF in root cloudbuild
 
-// 
-resource "google_secret_manager_secret" "webhook_trigger_secret_key" {
-  secret_id = "webhook_trigger-secret-key"
-
-  replication {
-    user_managed {
-      replicas {
-        location = "europe-west4"
-      }
-    }
-  }
+// This secret is manually created in Secret Manager: console.cloud.google.com/security/secret-manager
+data "google_secret_manager_secret_version" "webhook-trigger-secret" {
+  secret = "webhook-trigger-secret"
 }
 
-resource "google_secret_manager_secret_version" "webhook_trigger_secret_key_data" {
-  secret = google_secret_manager_secret.webhook_trigger_secret_key.id
-
-  secret_data = "secretkeygoeshere"
-}
-
-resource "google_secret_manager_secret" "webhook_trigger_api_key" {
-  secret_id = "webhook_trigger-secret-api-key"
-
-  replication {
-    user_managed {
-      replicas {
-        location = "europe-west4"
-      }
-    }
-  }
-}
-
-resource "google_secret_manager_secret_version" "webhook_trigger_api_key_data" {
-  secret = google_secret_manager_secret.webhook_trigger_api_key.id
-
-  secret_data = "AIzaSyCZ0MtGARFu_oF7i97DdcCd1s_Bz9nePvM"
+// This secret is copied from the api key generated in Credentials when making a webhook trigger
+data "google_secret_manager_secret_version" "webhook-trigger-api-key" {
+  secret = "webhook-trigger-api-key"
 }
 
 data "google_project" "project" {}
 
-data "google_iam_policy" "secret_accessor" {
-  binding {
-    role = "roles/secretmanager.secretAccessor"
-    members = [
-      "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudbuild.iam.gserviceaccount.com",
-    ]
-  }
-}
-
-resource "google_secret_manager_secret_iam_policy" "policy" {
-  project = google_secret_manager_secret.webhook_trigger_secret_key.project
-  secret_id = google_secret_manager_secret.webhook_trigger_secret_key.secret_id
-  policy_data = data.google_iam_policy.secret_accessor.policy_data
-}
+#data "google_iam_policy" "secret_accessor" {
+#  binding {
+#    role = "roles/secretmanager.secretAccessor"
+#    members = [
+#      "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudbuild.iam.gserviceaccount.com",
+#    ]
+#  }
+#}
+#
+#resource "google_secret_manager_secret_iam_policy" "policy" {
+#  project = google_secret_manager_secret.webhook_trigger_secret_key.project
+#  secret_id = google_secret_manager_secret.webhook_trigger_secret_key.secret_id
+#  policy_data = data.google_iam_policy.secret_accessor.policy_data
+#}
 
 
 resource "google_cloudbuild_trigger" "webhook-config-trigger" {
@@ -127,7 +100,8 @@ resource "google_cloudbuild_trigger" "webhook-config-trigger" {
   description = "acceptance test example webhook build trigger"
 
   webhook_config {
-    secret = google_secret_manager_secret_version.webhook_trigger_secret_key_data.id
+    # secret = google_secret_manager_secret_version.webhook_trigger_secret_key_data.id
+    secret = data.google_secret_manager_secret_version.webhook-trigger-secret.id
   }
 
   source_to_build {
